@@ -16,6 +16,9 @@
 let mediaRecorder;
 let recordedBlobs;
 
+const videoSelect = document.querySelector('select#videoSource');
+const selectors = [videoSelect];
+
 const codecPreferences = document.querySelector('#codecPreferences');
 
 const errorMsgElement = document.querySelector('span#errorMsg');
@@ -140,14 +143,51 @@ async function init(constraints) {
 document.querySelector('button#start').addEventListener('click', async () => {
   document.querySelector('button#start').disabled = true;
   const hasEchoCancellation = document.querySelector('#echoCancellation').checked;
+  const videoSource = videoSelect.value;
   const constraints = {
     audio: {
       echoCancellation: {exact: hasEchoCancellation}
     },
     video: {
-      width: 1280, height: 720
+      width: 1280, height: 720,
+      deviceId: videoSource ? {exact: videoSource} : undefined
     }
   };
   console.log('Using media constraints:', constraints);
   await init(constraints);
 });
+
+
+function gotDevices(deviceInfos) {
+  // Handles being called several times to update labels. Preserve values.
+  const values = selectors.map(select => select.value);
+  selectors.forEach(select => {
+    while (select.firstChild) {
+      select.removeChild(select.firstChild);
+    }
+  });
+  for (let i = 0; i !== deviceInfos.length; ++i) {
+    const deviceInfo = deviceInfos[i];
+    const option = document.createElement('option');
+    option.value = deviceInfo.deviceId;
+    if (deviceInfo.kind === 'audioinput' && typeof audioInputSelect !== 'undefined') {
+      option.text = deviceInfo.label || `microphone ${audioInputSelect.length + 1}`;
+        audioInputSelect.appendChild(option);
+    } else if (deviceInfo.kind === 'audiooutput' && typeof audioOutputSelect !== 'undefined') {
+      option.text = deviceInfo.label || `speaker ${audioOutputSelect.length + 1}`;
+      audioOutputSelect.appendChild(option);
+    } else if (deviceInfo.kind === 'videoinput') {
+      option.text = deviceInfo.label || `camera ${videoSelect.length + 1}`;
+      videoSelect.appendChild(option);
+    } else {
+      console.log('Some other kind of source/device: ', deviceInfo);
+    }
+  }
+  selectors.forEach((select, selectorIndex) => {
+    if (Array.prototype.slice.call(select.childNodes).some(n => n.value === values[selectorIndex])) {
+      select.value = values[selectorIndex];
+    }
+  });
+}
+
+navigator.mediaDevices.enumerateDevices().then(gotDevices).catch(() => {});
